@@ -21,6 +21,7 @@ cmip_label_path = "enso/H19_dataset/CMIP5/CMIP5_label_nino34_sort_1861_2001.nc"
 dt_sodas = xr.open_dataset("enso/H19_dataset/SODA/SODA.input.36mn.1871_1970.nc")
 dt_godas = xr.open_dataset("enso/H19_dataset/GODAS/GODAS.input.36mn.1980_2015.nc")
 dt_cmip = xr.open_dataset("enso/H19_dataset/CMIP5/lon_CMIP5_input_sort_1861_2001.nc")
+
 # Open label files with nino 3.4 index
 label_cmip = xr.open_dataset("enso/H19_dataset/CMIP5/CMIP5_label_nino34_sort_1861_2001.nc")
 label_sodas = xr.open_dataset("enso/H19_dataset/SODA/SODA.label.nino34.12mn_2mv.1873_1972.nc")
@@ -47,11 +48,9 @@ for epochs in range(n_epochs):
 # Iteration over all models of cmip
     for cmip_model in dt_cmip.model:
         cmip_training_data = SstDataset(cmip_path, cmip_label_path, lev=cmip_model+1)
-        train_loader = DataLoader(cmip_training_data, batch_size=18, shuffle=False)
+        train_loader = DataLoader(cmip_training_data, batch_size=64, shuffle=False)
         iterations = 0
         for data, target in train_loader:
-            print(len(data))
-            print(len(target))
             model.double() 
             optimizer.zero_grad()
             output = model(data)
@@ -59,8 +58,6 @@ for epochs in range(n_epochs):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()*data.size(0)
-            iterations += 1
-            print(iterations)
 
         epochs_train_saver[epochs] = train_loss
         print(f'Epoch: {epochs+1}\t Cmip-Model: {cmip_model} \tTraining Loss: {train_loss}')

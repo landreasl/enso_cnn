@@ -86,22 +86,27 @@ class SstDataset(Dataset):
 
 
     def __getitem__(self, index):
-        #TODO: Index nur ab 3 möglich
+        # To avoid an index out of bounce error, these if statements were implemented. The first and last datapoints
+        # are thereby considered multiple times
         if index < self.hist_time:
-            print("min")
             index = self.hist_time
+            label_buff = self.nino34[(index+self.lead_time)]
         
+        if (index+self.lead_time) >= len(self.nino34):
+            index = len(self.nino34) - self.lead_time - 1
+            label_buff = self.nino34[len(self.nino34)-1]
+
+        else:
+            label_buff = self.nino34[(index+self.lead_time)]
+        
+
         data_point = np.zeros((self.hist_time * 2, len(self.lat), len(self.lon)))
         data_point[:self.hist_time,:,:] = self.sst[index-self.hist_time:index].data
         data_point[self.hist_time:,:,:] = self.t300[index-self.hist_time:index].data
         data_point = torch.from_numpy(data_point)
 
-        if (index+self.lead_time) >= self.n_samples:
-            index = self.n_samples - self.lead_time - 1
-
-        label_buff = self.nino34[index+self.lead_time]
         label = torch.from_numpy(label_buff.data)
-        assert self.sst[index].time == self.nino34[index].time # Überprüft ob Zeiten gleich sind
+        assert self.sst[index].time == self.nino34[index].time
         return data_point, label
 
     def cut_map_area(ds, lon_range, lat_range):

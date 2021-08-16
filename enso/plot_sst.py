@@ -13,9 +13,9 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import numpy as np
 
 
-sodas_path = "H19_dataset/SODA/SODA.input.36mn.1871_1970.nc"
-sodas_path_l = "H19_dataset/SODA/SODA.label.nino34.12mn_2mv.1873_1972.nc"
-dt_sodas = xr.open_dataset("H19_dataset/SODA/SODA.input.36mn.1871_1970.nc")
+sodas_path = "enso/H19_dataset/SODA/SODA.input.36mn.1871_1970.nc"
+sodas_path_l = "enso/H19_dataset/SODA/SODA.label.nino34.12mn_2mv.1873_1972.nc"
+dt_sodas = xr.open_dataset("enso/H19_dataset/SODA/SODA.input.36mn.1871_1970.nc")
 
 def plot_anomalies(data_sst,lev):
     dmap = data_sst["sst"][0].sel(lev=lev)

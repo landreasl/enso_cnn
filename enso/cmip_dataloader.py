@@ -55,31 +55,20 @@ class SstDataset(Dataset):
             #TODO: ssta für andere datensätze konsistent 
             self.lon = dt["lon"]
             self.lat = dt["lat"]
-            if is_cmip == True:
-                self.time = dt["time"][24:]  # Data in cmip is shifted by 2 years in respect to nino labels
-                self.sst = dt["ssta"].sel(
-                    time=slice(dt.time[24],dt.time[-1]),
+            self.time = dt["time"][24:]  # Data in cmip is shifted by 2 years in respect to nino labels
+            self.sst = dt["ssta"].sel(
+                time=slice(dt.time[24],dt.time[-1]),
+                model=lev
+                ) # für ander daten lev = lev
+            self.t300 = dt["t300a"].sel(
+                time=slice(dt.time[24],dt.time[-1]),
+                model=lev)
+            self.n_samples = dt.time.size
+            with xr.open_dataset(label_file) as dt_label:
+                self.nino34 = dt_label["nino34"].sel(
+                    time=slice(dt_label.time[0], dt_label.time[-25]),
                     model=lev
-                    ) # für ander daten lev = lev
-                self.t300 = dt["t300a"].sel(
-                    time=slice(dt.time[24],dt.time[-1]),
-                    model=lev)
-                self.n_samples = dt.time.size
-                with xr.open_dataset(label_file) as dt_label:
-                    self.nino34 = dt_label["nino34"].sel(
-                        time=slice(dt_label.time[0], dt_label.time[-25]),
-                        model=lev
-                        )   
-            
-            else:
-                self.time = dt["time"][2:]  # Data is shifted by 2 years in respect to nino labels
-                self.sst = dt["sst"][2:].sel(lev=lev) # für ander daten lev = lev
-                self.t300 = dt["t300"][2:].sel(lev=lev)
-                self.n_samples = dt.time.size
-                with xr.open_dataset(label_file) as dt:
-                    self.nino34 = dt["pr"][:-2].sel(lev=lev)    
-        
-
+                    )   
 
         self.hist_time = hist_time
         self.lead_time = lead_time

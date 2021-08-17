@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch
 import xarray as xr
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 sodas_path = "enso/H19_dataset/SODA/SODA.input.36mn.1871_1970.nc"
 sodas_label_path= "enso/H19_dataset/SODA/SODA.label.nino34.12mn_2mv.1873_1972.nc"
@@ -35,7 +37,7 @@ lr = 0.0001
 criterion = nn.MSELoss()
 optimizer = optim.SGD(model.parameters(), lr=lr) 
 model.train()
-n_epochs = 10
+n_epochs = 2
 # %%
 
 # Initialize loss per epoche
@@ -43,24 +45,31 @@ epochs_train_saver = np.zeros(n_epochs)
 epochs_valid_saver = np.zeros(n_epochs)
 
 for epochs in range(n_epochs):
-    train_loss = 0.0
 
+    print(f'Epoche: {epochs+1}')
 # Iteration over all models of cmip
-    for cmip_model in dt_cmip.model:
+    for cmip_model in range(len(dt_cmip.model)):
+        train_loss = 0.0
         cmip_training_data = SstDataset(cmip_path, cmip_label_path, lev=cmip_model+1)
-        train_loader = DataLoader(cmip_training_data, batch_size=64, shuffle=False)
+        train_loader = DataLoader(cmip_training_data, batch_size=32, shuffle=False)
         iterations = 0
         for data, target in train_loader:
             model.double() 
             optimizer.zero_grad()
             output = model(data)
-            loss = criterion(output.float(), target.float())
+            loss = criterion(output.float().squeeze(), target.float())
             loss.backward()
             optimizer.step()
             train_loss += loss.item()*data.size(0)
 
+ 
+
         epochs_train_saver[epochs] = train_loss
-        print(f'Epoch: {epochs+1}\t Cmip-Model: {cmip_model} \tTraining Loss: {train_loss}')
+        print(f'Cmip-Model: {cmip_model+1} \tTraining Loss: {train_loss}')
+
+plt.plot(epochs_train_saver)
+plt.title(f"Number of Epochs = {n_epochs}")
+plt.show()
 
 
 

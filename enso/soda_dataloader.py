@@ -19,15 +19,16 @@ from xarray.core.common import C
 # TODO nn.sequential, torch.save, torch.load,
 # time labeling mit dictionary damit shufflebar, netzwerk kernelsize, cmip,
 # output tatächliche index mit vorhergesagt
+
+
 # %%
-"""dt = xr.open_dataset("H19_dataset/CMIP5/lon_CMIP5_input_sort_1861_2001.nc")
-label_cmip = xr.open_dataset("H19_dataset/CMIP5/CMIP5_label_nino34_sort_1861_2001.nc")
+dt = xr.open_dataset("/Users/andreasbaumgartner/Documents/Enso/enso2/enso3/enso_cnn/enso/H19_dataset/SODA/converted.SODA.input.nc")
+label = xr.open_dataset("/Users/andreasbaumgartner/Documents/Enso/enso2/enso3/enso_cnn/enso/H19_dataset/SODA/converted.SODA.label.nino34.12mn_2mv.1873_1972.nc")
 
-# Open Datasets
-dt_sodas = xr.open_dataset("H19_dataset/SODA/SODA.input.36mn.1871_1970.nc")
-label_sodas = xr.open_dataset("H19_dataset/SODA/SODA.label.nino34.12mn_2mv.1873_1972.nc")
 
-dt_sodas
+dt
+label
+
 # %%
 dt_sst = dt["ssta"].sel(
                     time=slice(dt.time[24],dt.time[-1]),
@@ -41,10 +42,10 @@ dt_nino = label_cmip["nino34"].sel(
 
 
 len(dt_nino)
-"""
+
 # %%
 # TODO cmip 3 jahre shift, dataset abfragen (erben) 
-class SstDataset(Dataset):
+class SodaSstDataset(Dataset):
     def __init__(
         self, file, label_file, long_range=[-180, 180], lat_range=[-60, 60], 
         lead_time=3, hist_time=3):
@@ -58,40 +59,69 @@ class SstDataset(Dataset):
             #TODO: ssta für andere datensätze konsistent 
             self.lon = dt["lon"]
             self.lat = dt["lat"]
+            self.lev = dt["lev"]
 
             self.time = dt["time"][2:]  # Data is shifted by 2 years with respect to nino labels
             self.sst = dt["sst"][2:].sel(
-                lev=slice(24,37), # Choose time between january and december 
+                lev=slice(24,37) # Choose time between january and december 
             )  
             self.t300 = dt["t300"][2:].sel(
-                lev=slice(24,37), # Choose time between january and december 
+                lev=slice(24,37)
             )
             self.n_samples = dt.time.size
             with xr.open_dataset(label_file) as dt:
-                self.nino34 = dt["pr"][:-2]
+                self.nino34 = dt["pr"][:-2] 
         
         self.hist_time = hist_time
         self.lead_time = lead_time
 
 
     def __getitem__(self, index):
-        # To avoid an index out of bounce error, these if statements were implemented. The first and last datapoints
-        # are thereby considered multiple times
+        # To avoid an index out of bounce error, these if-statements were implemented. The first and last datapoints
+        # are thereby considered multiple times. 
+        # Different to cmip_dataloader because of data's structure
+        lead_index = index + self.lead_time
+
         if index < self.hist_time:
             index = self.hist_time
-            label_buff = self.nino34[(index+self.lead_time)]
+            lead_index = index + self.lead_time
+            label_buff = self.nino34.sel(
+                time = self.time[int(lead_index/12)],
+                lev = self.lev[(lead_index+1)%12]
+            )
         
-        if (index+self.lead_time) >= len(self.nino34):
-            index = len(self.nino34) - self.lead_time - 1
-            label_buff = self.nino34[len(self.nino34)-1]
+        if lead_index >= (len(self.nino34.time)*12):
+            index = (len(self.nino34) * 12) - self.lead_time - 1
+            lead_index = index + self.lead_time
+            label_buff = self.nino34.sel(
+                time = self.time[int(lead_index/12)],
+                lev = self.lev[(lead_index+1)%12])
 
-        else:
-            label_buff = self.nino34[(index+self.lead_time)]
+        else: 
+            label_buff = self.nino34.sel(
+                time = self.time[int(lead_index/12)],
+                lev = self.lev[(lead_index+1)%12]
+            )
         
+        sst_buff = self.sst.sel(
+            time = self.time[int(index/12)]
+        ).data
+
+        t300_buff = self.t300.sel(
+            time = self.time[int(index/12)]
+        ).data
 
         data_point = np.zeros((self.hist_time * 2, len(self.lat), len(self.lon)))
-        data_point[:self.hist_time,:,:] = self.sst[index-self.hist_time:index].data
-        data_point[self.hist_time:,:,:] = self.t300[index-self.hist_time:index].data
+
+        for i in range(self.hist_time+1):
+            data_point[i,:,:] = self.sst.sel(
+                time = self.time[int(index-self.hist_time+1+i/12)],
+                lev = (self.lev[((index-i)%12)+24])
+            ).data
+            data_point[self.hist_time+i,:,:] = self.t300.sel(
+                time = self.time[int(index-i/12)],
+                lev = (self.lev[((index-i)%12)+24])
+            ).data
         data_point = torch.from_numpy(data_point)
 
         label = torch.from_numpy(label_buff.data)
@@ -118,5 +148,7 @@ class SstDataset(Dataset):
         return (np.datetime64('1950-01-01', 'ns')
                 + timestamp * np.timedelta64(1, 'D') )
     
-# %%
+print(12%15)
 
+
+# %%

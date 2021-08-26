@@ -31,12 +31,14 @@ lr = 0.005
 criterion = nn.MSELoss()
 optimizer = optim.SGD(model.parameters(), lr=lr)
 model.train()
-n_epochs = 40   
+n_epochs = 200
+lead_time = 3
 # %%
 
 # Initialize loss per epoche
 epochs_train_saver = np.zeros(n_epochs)
 epochs_valid_saver = np.zeros(n_epochs)
+epochs_soda_train_saver = np.zeros(n_epochs)
 
 for epochs in range(n_epochs):
     print(f'Epoche: {epochs+1}')
@@ -46,7 +48,7 @@ for epochs in range(n_epochs):
     for cmip_model in range(len(dt_cmip.model)):
         train_loss = 0.0
         cmip_training_data = SstDataset(
-            cmip_path, cmip_label_path, lev=cmip_model+1)
+            cmip_path, cmip_label_path, lead_time = lead_time, lev=cmip_model+1)
         train_loader = DataLoader(
             cmip_training_data, batch_size=32, shuffle=False)
         for data, target in train_loader:
@@ -61,10 +63,13 @@ for epochs in range(n_epochs):
         epochs_train_saver[epochs] = train_loss
         print(f'Cmip-Model: {cmip_model+1} \tTraining Loss: {train_loss}')
     
+
+for epochs in range(n_epochs):
+    print(f'Epoche: {epochs+1}')
     # Training with SODAS-data
     train_loss = 0.0
     soda_training_data = SstDataset(
-        sodas_path, sodas_label_path, is_cmip=False)
+        sodas_path, sodas_label_path, is_cmip=False, lead_time = lead_time)
     train_loader = DataLoader(soda_training_data, batch_size=32, shuffle=False)
     for data, target in train_loader:
         model.double()
@@ -75,10 +80,12 @@ for epochs in range(n_epochs):
         optimizer.step()
         train_loss += loss.item()*data.size(0)
 
+    
+    epochs_soda_train_saver[epochs] = train_loss
     print(f'Soda \tTraining Loss: {train_loss}')
 
     # Validation with GODA-data
-    goda_valid_data = SstDataset(godas_path, godas_label_path, is_cmip=False)
+    goda_valid_data = SstDataset(godas_path, godas_label_path, is_cmip=False, lead_time = lead_time)
     valid_loader = DataLoader(goda_valid_data, 32, shuffle=False)
 
     valid_loss = 0.0
@@ -95,9 +102,12 @@ for epochs in range(n_epochs):
 
 
 
-plt.plot(epochs_train_saver)
-plt.plot(epochs_valid_saver)
-plt.title(f"Number of Epochs = {n_epochs}")
+plt.plot(epochs_train_saver, label='train-loss CMIP')
+plt.plot(epochs_valid_saver, label='validation-loss GODA')
+plt.plot(epochs_soda_train_saver, label='train-loss SODAS')
+plt.legend()
+plt.title(f"Number of Epochs = {n_epochs} Learning Rate = {lr}")
+plt.savefig(f"/Users/andreasbaumgartner/Desktop/enso_training/{n_epochs}_epochs_{lr}_lr.png")
 plt.show()
 
 

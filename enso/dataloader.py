@@ -92,7 +92,10 @@ class SstDataset(Dataset):
         data_point[self.hist_time:,:,:] = self.t300[index-self.hist_time:index].data
         data_point = torch.from_numpy(data_point)
 
-        label = torch.from_numpy(label_buff.data)
+        label = {
+            "nino3_4" : torch.from_numpy(label_buff.data),
+            "time_index" : lead_index
+            }
         assert self.sst[index].time == self.nino34[index].time
         return data_point, label
 

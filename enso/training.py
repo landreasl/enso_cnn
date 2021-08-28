@@ -134,15 +134,27 @@ for lead_time in range(1,24):
     pred_nino = []
     actual_nino = []
     count = 0
+    hist_time = 3
     with torch.no_grad():
         for data, label in valid_loader:
-            model.double()
-            pred_nino.append(model(data).numpy()) 
-            actual_nino.append(label["nino3_4"].numpy())
-            time.append(goda_valid_data.time[label["time_index"]])
-            if count == 2:
+            if count < hist_time:
+                print("out")
+
+            elif count >= 12:
+                print("in")
                 break
+
+            else:    
+                model.double()
+                pred_nino.append(model(data).numpy()) 
+                actual_nino.append(label["nino3_4"].numpy())
+                time.append(goda_valid_data.time[label["time_index"]])
+                print("yes" + str(count))
+            
             count += 1
+
+
+
     # %%
     plt.plot(np.array(time).flatten(), np.array(actual_nino).flatten(), label = "nino3.4")
     plt.plot(np.array(time).flatten(), np.array(pred_nino).flatten(), label = "predicted nino3.4")

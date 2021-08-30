@@ -79,7 +79,7 @@ class SstDataset(Dataset):
             index = self.hist_time
             label_buff = self.nino34[lead_index]
         
-        if lead_index >= len(self.nino34):
+        elif lead_index >= len(self.nino34):
             index = len(self.nino34) - self.lead_time - 1
             label_buff = self.nino34[-1]
 

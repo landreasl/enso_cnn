@@ -50,10 +50,14 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = self.pool(torch.tanh(self.conv1(x)))
+        x = self.dropout(x)
         x = self.pool(torch.tanh(self.conv2(x)))
+        x = self.dropout(x)
         x = torch.tanh(self.conv3(x))
+        x = self.dropout(x)
         x = x.view(-1, int((self.width/4*self.height/4)*self.M/2)) # last factor of 0.5 to match target size (why?)
         x = torch.tanh(self.fc1(x))
+        x = self.dropout(x)
         x = self.fc2(x)
 
         return x

@@ -1,8 +1,8 @@
 # %%
-from posixpath import dirname
 from dataloader import SstDataset
 import nn_enso
 
+from posixpath import dirname
 import os
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
@@ -22,8 +22,6 @@ godas_path = PATH + "/H19_dataset/GODAS/converted.GODAS.input.nc"
 godas_label_path = PATH + "/H19_dataset/GODAS/converted.GODAS.label.12mn_2mv.1982_2017.nc"
 cmip_path = PATH + "/H19_dataset/CMIP5/lon_CMIP5_input_sort_1861_2001.nc"
 cmip_label_path = PATH + "/H19_dataset/CMIP5/CMIP5_label_nino34_sort_1861_2001.nc"
-
-
 
 dt_cmip = xr.open_dataset(
     cmip_path)
@@ -50,8 +48,7 @@ epochs_train_saver = np.zeros(PRETRAINING_EPOCHS)
 epochs_valid_saver = np.zeros(REANALYSIS_EPOCHS)
 epochs_soda_train_saver = np.zeros(REANALYSIS_EPOCHS)
 
-
-for lead_time in range(1,23):
+for lead_time in range(1,24):
     dirname = PATH + f"/output/model_lead_{lead_time}"
     try: 
         os.mkdir(dirname)
@@ -97,7 +94,6 @@ for lead_time in range(1,23):
             optimizer.step()
             train_loss += loss.item()*data.size(0)
 
-        
         epochs_soda_train_saver[epochs] = train_loss
         print(f'Soda \tTraining Loss: {train_loss}')
 
@@ -113,68 +109,55 @@ for lead_time in range(1,23):
                 output = model(data)
                 loss = criterion(output.float().squeeze(), target.float())
                 valid_loss += loss.item()*data.size(0)
-            
-            epochs_valid_saver[epochs] = valid_loss
-        
+            epochs_valid_saver[epochs] = valid_loss    
         print(f'Goda \tValidation Loss: {valid_loss}')
-        # %%
-        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-        ax1.plot((epochs_train_saver), label='train-loss CMIP')
-        ax1.set_title(f"Number of Epochs = {PRETRAINING_EPOCHS} Learning Rate = {LR}")
-        ax2.plot((epochs_valid_saver), label='validation-loss GODA')
-        ax2.plot((epochs_soda_train_saver), label='train-loss SODAS')
-        ax2.legend()
-        ax2.set_title(f"Number of Epochs = {REANALYSIS_EPOCHS} Learning Rate = {LR}")
-        plt.savefig(dirname + f"/{PRETRAINING_EPOCHS}_epochs_{LR}_lr.png")
-        # %%
-        torch.save(model.state_dict(), dirname + f"/cnn_model_{PRETRAINING_EPOCHS}_epochs.pt")
+    # %%
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+    ax1.plot((epochs_train_saver), label='train-loss CMIP')
+    ax1.set_title(f"Number of Epochs = {PRETRAINING_EPOCHS} Learning Rate = {LR}")
+    ax2.plot((epochs_valid_saver), label='validation-loss GODA')
+    ax2.plot((epochs_soda_train_saver), label='train-loss SODAS')
+    ax2.legend()
+    ax2.set_title(f"Number of Epochs = {REANALYSIS_EPOCHS} Learning Rate = {LR}")
+    plt.savefig(dirname + f"/{PRETRAINING_EPOCHS}_epochs_{LR}_lr.png")
+    # %%
+    torch.save(model.state_dict(), dirname + f"/cnn_model_{PRETRAINING_EPOCHS}_epochs.pt")
+    # %%
+    lead_time = 3
+    goda_valid_data = SstDataset(godas_path, godas_label_path, is_cmip=False, lead_time = lead_time)
+    valid_loader = DataLoader(goda_valid_data, 1, shuffle=False)
+    time = []
+    pred_nino = []
+    actual_nino = []
+    count = 0
+    hist_time = 3
+    with torch.no_grad():
+        for data, label in valid_loader:
+            if count < hist_time:
+                None
 
+            elif count >= 405:
+                break
 
-        # %%
-        model = nn_enso.Net(M, N, len(dt_cmip.lon),
-                            len(dt_cmip.lat), input_channels=6)
-        model.load_state_dict(torch.load(PATH + "/output/cnn_model_600_epochs.pt"))
-        model.eval()
-        # %%
-        lead_time = 3
-        goda_valid_data = SstDataset(godas_path, godas_label_path, is_cmip=False, lead_time = lead_time)
-        valid_loader = DataLoader(goda_valid_data, 1, shuffle=False)
-        time = []
-        pred_nino = []
-        actual_nino = []
-        count = 0
-        hist_time = 3
-        with torch.no_grad():
-            for data, label in valid_loader:
-                if count < hist_time:
-                    None
+            else:    
+                model.double()
+                pred_nino.append(model(data).numpy()) 
+                actual_nino.append(label["nino3_4"].numpy())
+                time.append(goda_valid_data.time[label["time_index"]])
+            
+            count += 1
 
-                elif count >= 405:
-                    break
+    # Auskommentiert, da sich der Plot nicht speichern liess (value error)
+    """plt.plot((np.array(time).flatten()), np.array(actual_nino).flatten(), label = "nino3.4", )
+    plt.plot((np.array(time)).flatten(), np.array(pred_nino).flatten(), label = "predicted nino3.4")
+    plt.legend()
+    plt.show()
+    plt.savefig(dirname + "/nino.png")"""
 
-                else:    
-                    model.double()
-                    pred_nino.append(model(data).numpy()) 
-                    actual_nino.append(label["nino3_4"].numpy())
-                    time.append(goda_valid_data.time[label["time_index"]])
-                
-                count += 1
-
-
-
-        
-        plt.plot(np.array(time).flatten(), np.array(actual_nino).flatten(), label = "nino3.4")
-        plt.plot(np.array(time).flatten(), np.array(pred_nino).flatten(), label = "predicted nino3.4")
-        plt.legend()
-        plt.savefig(dirname + f"/nino.png")
-
-        
-
-        
-        coefficient = np.corrcoef(np.array(pred_nino).flatten(), np.array(actual_nino).flatten())
-        coefficient = coefficient[0,1]
-        print(coefficient)
-        # %%
+    coefficient = np.corrcoef(np.array(pred_nino).flatten(), np.array(actual_nino).flatten())
+    coefficient = coefficient[0,1]
+    print(coefficient)
+    # %%
     with open("coefficient.txt", "a") as f:
         f.write(f"{lead_time}\t {coefficient}\n")
     # %%
